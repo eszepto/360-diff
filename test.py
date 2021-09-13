@@ -84,8 +84,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2 
 import matplotlib.pyplot as plt
-image1 = grammar_correction(cv.imread('./A/03.JPG'))       # queryImage
-image2 = grammar_correction(cv.imread('./A/04.JPG')) # trainImage
+image1 = grammar_correction(cv2 .imread('./A/03.JPG', cv2.IMREAD_COLOR))       # queryImage
+image2 = grammar_correction(cv2 .imread('./A/04.JPG', cv2.IMREAD_COLOR)) # trainImage
 
 # compute difference
 difference = cv2.subtract(image2, image1)
@@ -93,18 +93,32 @@ difference = cv2.subtract(image2, image1)
 # color the mask red
 Conv_hsv_Gray = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
 ret, mask = cv2.threshold(Conv_hsv_Gray, 0, 255,cv2.THRESH_BINARY_INV |cv2.THRESH_OTSU)
-difference[mask != 255] = [78, 192, 245]
+difference[mask != 255] = [255,255,255]
 difference[mask == 255] = [0,0,0]
+
+d = np.zeros_like(difference, np.uint8)
+d[mask != 255] = image1[mask != 255]
+cv2.imwrite('diff3.png', d)
+tmp = cv2.cvtColor(d, cv2.COLOR_BGR2GRAY)
+_,alpha = cv2.threshold(tmp,0,255,cv2.THRESH_BINARY)
+b, g, r = cv2.split(d)
+rgba = [b,g,r, alpha]
+diffTransparent = cv2.merge(rgba,4)
+# for i,pixel in enumerate(diffTransparent):
+#     print(diffTransparent[i])
+
+
 # add the red mask to the images to make the differences obvious
+image2[mask != 255] = [0,0,255]
 image1[mask != 255] = [0, 0, 255]
-#image2[mask != 255] = [0, 0, 255]
-image2 = cv2.addWeighted(image2, 0.5, difference, 0.5, 0)
+
+
 
 # store images
 cv2.imwrite('diffOverImage1.png', image1)
 cv2.imwrite('diffOverImage2.png', image2)
 cv2.imwrite('diff.png', difference)
-cv2.imwrite('mask.png', ret)
+cv2.imwrite('mask2.png', mask)
 
 #-----------------------------------------------------------------------------
 # make diff using SSIM
@@ -159,10 +173,10 @@ cv2.imwrite('filled after.png',filled_after)
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
-img1 = cv.imread('./A/02.JPG',cv.IMREAD_GRAYSCALE)          # queryImage
+img1 = cv.imread('./A/03.JPG',cv.IMREAD_GRAYSCALE)          # queryImage
 img2 = cv.imread('./A/04.JPG',cv.IMREAD_GRAYSCALE) # trainImage
 # Initiate SIFT detector
-sift = cv.SIFT_create()
+sift = cv2.SIFT_create()
 # find the keypoints and descriptors with SIFT
 kp1, des1 = sift.detectAndCompute(img1,None)
 kp2, des2 = sift.detectAndCompute(img2,None)
@@ -177,8 +191,10 @@ matches = flann.knnMatch(des1,des2,k=2)
 matchesMask = [[0,0] for i in range(len(matches))]
 # ratio test as per Lowe's paper
 for i,(m,n) in enumerate(matches):
-    if m.distance < 0.7*n.distance:
+    if m.distance < 0.75*n.distance:
         matchesMask[i]=[1,0]
+
+      
 draw_params = dict(matchColor = (0,255,0),
                    singlePointColor = (255,0,0),
                    matchesMask = matchesMask,
@@ -191,37 +207,33 @@ plt.imshow(img3,),plt.show()
 import cv2
 import numpy as np
 
-MAX_FEATURES = 500
-GOOD_MATCH_PERCENT = 0.03
+MAX_FEATURES = 20000
+GOOD_MATCH_PERCENT = 0.01
 
 def alignImages(im1, im2):
 
     
     # Convert images to grayscale
-    im1Gray = cv2.cvtColor(im1, cv2.COLOR_BGR2HSV)
-    im2Gray = cv2.cvtColor(im2, cv2.COLOR_BGR2HSV)
+    im1Gray = cv2.cvtColor(im1, cv2.COLOR_BGR2GRAY)
+    im2Gray = cv2.cvtColor(im2, cv2.COLOR_BGR2GRAY)
 
     # Detect ORB features and compute descriptors.
     orb = cv2.ORB_create(MAX_FEATURES)
-    keypoints1, descriptors1 = orb.detectAndCompute(im1Gray, None)
-    keypoints2, descriptors2 = orb.detectAndCompute(im2Gray, None)
+    keypoints1, descriptors1 = orb.detectAndCompute(im1, None)
+    keypoints2, descriptors2 = orb.detectAndCompute(im2, None)
 
+    i = cv2.drawKeypoints(im1, keypoints1, None, color=[0,255,0])
+    plt.imshow(i), plt.show()
     # Match features.
-    #   matcher = cv2.DescriptorMatcher_create(cv2.DESCRIPTOR_MATCHER_BRUTEFORCE_HAMMING)
-    #   matches = matcher.match(descriptors1, descriptors2, None)
-
-    FLANN_INDEX_KDTREE = 1
-    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-    search_params = dict(checks=50)   # or pass empty dictionary
-    flann = cv.FlannBasedMatcher(index_params,search_params)
-    matches = flann.knnMatch(des1,des2,k=2)
-    matches = [match[0] for match in matches if len(match) == 2 and match[0].distance < 0.7*match[1].distance]
+    matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+    matches = matcher.match(descriptors1, descriptors2, None)
     # Sort matches by score
     matches.sort(key=lambda x: x.distance, reverse=False)
 
+
     # Remove not so good matches
     numGoodMatches = int(len(matches) * GOOD_MATCH_PERCENT)
-    matches = matches[:numGoodMatches]
+    matches = matches[:10]
 
     # Draw top matches
     imMatches = cv2.drawMatches(im1, keypoints1, im2, keypoints2, matches, None)
@@ -268,3 +280,51 @@ cv2.imwrite(outFilename, imReg)
 
 # Print estimated homography
 print("Estimated homography : \n",  h)
+
+#-------------------------------------------------------------------------------
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+
+img1 = grammar_correction(cv2.imread("./A/03.JPG", cv2.IMREAD_COLOR))
+img2 = grammar_correction(cv2.imread("./A/04.JPG", cv2.IMREAD_COLOR))
+# Convert images to grayscale
+im1Gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+im2Gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+# Initiate SIFT detector
+orb = cv2.ORB_create(10000)
+
+# find the keypoints and descriptors with SIFT
+kp1, des1 = orb.detectAndCompute(im1Gray,None)
+kp2, des2 = orb.detectAndCompute(im2Gray,None)
+
+# FLANN parameters
+FLANN_INDEX_KDTREE = 0
+index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+search_params = dict(checks=50)   # or pass empty dictionary
+
+flann = cv2.FlannBasedMatcher(index_params,search_params)
+
+des1 = np.float32(des1)
+des2 = np.float32(des2)
+
+matches = flann.knnMatch(des1,des2,k=2)
+
+# Need to draw only good matches, so create a mask
+matchesMask = [[0,0] for i in range(len(matches))]
+
+# ratio test as per Lowe's paper
+for i,(m,n) in enumerate(matches):
+    if m.distance < 0.7*n.distance:
+        matchesMask[i]=[1,0]
+
+draw_params = dict(matchColor = (0,255,0),
+                   singlePointColor = (255,0,0),
+                   matchesMask = matchesMask,
+                   flags = 0)
+
+img3 = cv2.drawMatchesKnn(img1,kp1,img2,kp2,matches,None,**draw_params)
+cv2.imwrite("orbFlann.png", img3)
+plt.imshow(img3,),plt.show()
+#---------------------------------------------------------------------
