@@ -93,24 +93,31 @@ difference = cv2.subtract(image2, image1)
 # color the mask red
 Conv_hsv_Gray = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
 ret, mask = cv2.threshold(Conv_hsv_Gray, 0, 255,cv2.THRESH_BINARY_INV |cv2.THRESH_OTSU)
-difference[mask != 255] = [255,255,255]
-difference[mask == 255] = [0,0,0]
 
-d = np.zeros_like(difference, np.uint8)
-d[mask != 255] = image1[mask != 255]
-cv2.imwrite('diff3.png', d)
+difference[mask == 255] = [0,0,0]
+difference[mask != 255] = [255,255,255]
+
+d = cv2.bitwise_and(image1, difference)
+cv2.imwrite("diff4.png", d)
+
 tmp = cv2.cvtColor(d, cv2.COLOR_BGR2GRAY)
 _,alpha = cv2.threshold(tmp,0,255,cv2.THRESH_BINARY)
 b, g, r = cv2.split(d)
 rgba = [b,g,r, alpha]
 diffTransparent = cv2.merge(rgba,4)
-# for i,pixel in enumerate(diffTransparent):
-#     print(diffTransparent[i])
+
 
 
 # add the red mask to the images to make the differences obvious
-image2[mask != 255] = [0,0,255]
-image1[mask != 255] = [0, 0, 255]
+print(diffTransparent.shape)
+print(image2.shape)
+alpha_s = diffTransparent[:, :, 3] / 255.0
+alpha_l = 1.0 - alpha_s
+
+image2[mask != 255] = 0.7 * d[mask != 255] + 0.3 * image2[mask != 255]
+
+
+image1[mask != 255] = [0,0,255]
 
 
 
