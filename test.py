@@ -77,6 +77,16 @@ cv2.imwrite('auto_result.png', auto_result)
 
 
 #--------------------------------------------------------------------
+
+def cvtYellowScale(img):
+    grayImage = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # BGR 3,186,252
+    b = grayImage/255 * 107
+    g = grayImage/255 * 248
+    r = grayImage/255 * 255
+    outImage = cv2.merge([b,g,r], 3)
+    return outImage
+
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
@@ -84,7 +94,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2 
 import matplotlib.pyplot as plt
-image1 = grammar_correction(cv2 .imread('./A/03.JPG', cv2.IMREAD_COLOR))       # queryImage
+image1 = grammar_correction(cv2 .imread('./A/02.JPG', cv2.IMREAD_COLOR))       # queryImage
 image2 = grammar_correction(cv2 .imread('./A/04.JPG', cv2.IMREAD_COLOR)) # trainImage
 
 # compute difference
@@ -97,24 +107,17 @@ ret, mask = cv2.threshold(Conv_hsv_Gray, 0, 255,cv2.THRESH_BINARY_INV |cv2.THRES
 difference[mask == 255] = [0,0,0]
 difference[mask != 255] = [255,255,255]
 
-d = cv2.bitwise_and(image1, difference)
-cv2.imwrite("diff4.png", d)
 
-tmp = cv2.cvtColor(d, cv2.COLOR_BGR2GRAY)
-_,alpha = cv2.threshold(tmp,0,255,cv2.THRESH_BINARY)
-b, g, r = cv2.split(d)
-rgba = [b,g,r, alpha]
-diffTransparent = cv2.merge(rgba,4)
+d = cv2.bitwise_and(image1, difference)
+o = cvtYellowScale(d)
+cv2.imwrite("diff4.png", o)
+
 
 
 
 # add the red mask to the images to make the differences obvious
-print(diffTransparent.shape)
-print(image2.shape)
-alpha_s = diffTransparent[:, :, 3] / 255.0
-alpha_l = 1.0 - alpha_s
 
-image2[mask != 255] = 0.7 * d[mask != 255] + 0.3 * image2[mask != 255]
+image2[mask != 255] = (0.65 * o[mask != 255]) + (0.35 * image2[mask != 255])
 
 
 image1[mask != 255] = [0,0,255]
@@ -207,7 +210,7 @@ draw_params = dict(matchColor = (0,255,0),
                    matchesMask = matchesMask,
                    flags = cv.DrawMatchesFlags_DEFAULT)
 img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,matches,None,**draw_params)
-plt.imshow(img3,),plt.show()
+# plt.imshow(img3,),plt.show()
 
 #--------------------------------------------------------------------
 # Alignment
@@ -226,11 +229,9 @@ def alignImages(im1, im2):
 
     # Detect ORB features and compute descriptors.
     orb = cv2.ORB_create(MAX_FEATURES)
-    keypoints1, descriptors1 = orb.detectAndCompute(im1, None)
-    keypoints2, descriptors2 = orb.detectAndCompute(im2, None)
+    keypoints1, descriptors1 = orb.detectAndCompute(im1Gray, None)
+    keypoints2, descriptors2 = orb.detectAndCompute(im2Gray, None)
 
-    i = cv2.drawKeypoints(im1, keypoints1, None, color=[0,255,0])
-    plt.imshow(i), plt.show()
     # Match features.
     matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
     matches = matcher.match(descriptors1, descriptors2, None)
@@ -333,5 +334,46 @@ draw_params = dict(matchColor = (0,255,0),
 
 img3 = cv2.drawMatchesKnn(img1,kp1,img2,kp2,matches,None,**draw_params)
 cv2.imwrite("orbFlann.png", img3)
-plt.imshow(img3,),plt.show()
+# plt.imshow(img3,),plt.show()
 #---------------------------------------------------------------------
+
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+
+img1 = cv2.imread("./A/02.JPG", cv2.IMREAD_COLOR)
+img2 = grammar_correction(cv2.imread("./A/04.JPG", cv2.IMREAD_COLOR))
+# Convert images to grayscale
+im1Gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+im2Gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+ret, thresh = cv2.threshold(im1Gray, 127, 255, 0)
+_, contours, hierarchy = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_TC89_L1)
+cv.drawContours(img1, contours, -1, (0,255,0), 3)
+cv2.imwrite("contour.png", img1)
+
+#-----------------------------------------------------------------------
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+
+
+img = cv2.imread("./A/02.JPG", cv2.IMREAD_GRAYSCALE)
+src = cv2.cuda_GpuMat()
+src.upload(img)
+
+clahe = cv2.cuda.createCLAHE(clipLimit=5.0, tileGridSize=(8, 8))
+dst = clahe.apply(src, cv2.cuda_Stream.Null())
+
+result = dst.download()
+
+cv2.imshow("result", result)
+cv2.waitKey(0)
+
+
+img1 = cv2.imread("./A/02.JPG", cv2.IMREAD_COLOR)
+
+engine = cv2.hfs.HfsSegment_create(img1.shape[0], img1.shape[1])
+
+out = engine.performSegmentGpu(img1, False)
+cv2.imwrite("hfs.png", out)
