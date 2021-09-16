@@ -87,6 +87,25 @@ def cvtYellowScale(img):
     outImage = cv2.merge([b,g,r], 3)
     return outImage
 
+def findHuman(img):
+    img = img.copy()
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    hog = cv2.HOGDescriptor()
+    hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+
+    # detect people in the image
+    # returns the bounding boxes for the detected objects
+    boxes, weights = hog.detectMultiScale(gray, winStride=(16,16), scale=1.05 )
+
+    boxes = np.array([[x, y, x + w, y + h] for (x, y, w, h) in boxes])
+
+
+    for (xA, yA, xB, yB) in boxes:
+        # display the detected boxes in the colour picture
+        cv2.rectangle(img, (xA, yA), (xB, yB),
+                            (0, 255, 0), 2)
+    return img
+
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
@@ -109,6 +128,8 @@ difference[mask != 255] = [255,255,255]
 
 
 d = cv2.bitwise_and(image1, difference)
+t = findHuman(d)
+cv2.imwrite("diff5.jpeg", t)
 o = cvtYellowScale(d)
 cv2.imwrite("diff4.png", o)
 
@@ -341,39 +362,27 @@ import numpy as np
 import cv2
 from matplotlib import pyplot as plt
 
-img1 = cv2.imread("./A/02.JPG", cv2.IMREAD_COLOR)
+img1 = cv2.imread("./A/03.JPG", cv2.IMREAD_COLOR)
 img2 = grammar_correction(cv2.imread("./A/04.JPG", cv2.IMREAD_COLOR))
 # Convert images to grayscale
 im1Gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 im2Gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
 ret, thresh = cv2.threshold(im1Gray, 127, 255, 0)
-_, contours, hierarchy = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_TC89_L1)
+contours, hierarchy = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE)
 cv.drawContours(img1, contours, -1, (0,255,0), 3)
 cv2.imwrite("contour.png", img1)
 
 #-----------------------------------------------------------------------
 import numpy as np
 import cv2
-from matplotlib import pyplot as plt
 
 
-img = cv2.imread("./A/02.JPG", cv2.IMREAD_GRAYSCALE)
-src = cv2.cuda_GpuMat()
-src.upload(img)
-
-clahe = cv2.cuda.createCLAHE(clipLimit=5.0, tileGridSize=(8, 8))
-dst = clahe.apply(src, cv2.cuda_Stream.Null())
-
-result = dst.download()
-
-cv2.imshow("result", result)
-cv2.waitKey(0)
-
-
+ 
 img1 = cv2.imread("./A/02.JPG", cv2.IMREAD_COLOR)
+gray = cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY)
 
-engine = cv2.hfs.HfsSegment_create(img1.shape[0], img1.shape[1])
+img1 = findHuman(img1)
+# Write the output video 
 
-out = engine.performSegmentGpu(img1, False)
-cv2.imwrite("hfs.png", out)
+cv2.imwrite("human.png", img1)
