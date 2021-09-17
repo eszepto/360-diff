@@ -95,7 +95,7 @@ def findHuman(img):
 
     # detect people in the image
     # returns the bounding boxes for the detected objects
-    boxes, weights = hog.detectMultiScale(gray, winStride=(16,16), scale=1.05 )
+    boxes, weights = hog.detectMultiScale(gray, winStride=(16,16), scale=1.01 )
 
     boxes = np.array([[x, y, x + w, y + h] for (x, y, w, h) in boxes])
 
@@ -104,8 +104,15 @@ def findHuman(img):
         # display the detected boxes in the colour picture
         cv2.rectangle(img, (xA, yA), (xB, yB),
                             (0, 255, 0), 2)
-    return img
+    
+    return img, boxes
 
+def removeHumanFromMask(img, boxes):
+    for (xA, yA, xB, yB) in boxes:
+        # display the detected boxes in the colour picture
+        cv2.rectangle(img, (xA, yA), (xB, yB),
+                            (0, 0, 0), -1)
+    return img
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
@@ -127,23 +134,33 @@ difference[mask == 255] = [0,0,0]
 difference[mask != 255] = [255,255,255]
 
 
-d = cv2.bitwise_and(image1, difference)
-t = findHuman(d)
-cv2.imwrite("diff5.jpeg", t)
-o = cvtYellowScale(d)
-cv2.imwrite("diff4.png", o)
+diffInActualImage = cv2.bitwise_and(image1, difference )
+imgWithHumanDetect, boxes = findHuman(image1)
+diffInActualImage = removeHumanFromMask(diffInActualImage, boxes)
+
+Conv_hsv_Gray = cv2.cvtColor(diffInActualImage, cv2.COLOR_BGR2GRAY)
+ret, mask = cv2.threshold(Conv_hsv_Gray, 0, 255,cv2.THRESH_BINARY_INV |cv2.THRESH_OTSU)
+
+cv2.imwrite("diff5.jpeg", diffInActualImage)
+diffWithYellowHighlight = cvtYellowScale(diffInActualImage)
+cv2.imwrite("diff4.png", diffWithYellowHighlight)
 
 
 
 
 # add the red mask to the images to make the differences obvious
 
-image2[mask != 255] = (0.65 * o[mask != 255]) + (0.35 * image2[mask != 255])
-
-
+image2[mask != 255] = (0.65 * diffWithYellowHighlight[mask != 255]) + (0.35 * image2[mask != 255])
 image1[mask != 255] = [0,0,255]
 
-
+for (xA, yA, xB, yB) in boxes:
+        # display the detected boxes in the colour picture
+        cv2.rectangle(image2, (xA, yA), (xB, yB),
+                            (0, 255, 0), 2)
+for (xA, yA, xB, yB) in boxes:
+        # display the detected boxes in the colour picture
+        cv2.rectangle(image1, (xA, yA), (xB, yB),
+                            (0, 255, 0), 2)
 
 # store images
 cv2.imwrite('diffOverImage1.png', image1)
